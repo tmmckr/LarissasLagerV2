@@ -25,6 +25,8 @@ function App() {
   const [expenses, setExpenses] = useState([]);
   const [newExpDesc, setNewExpDesc] = useState("");
   const [newExpAmount, setNewExpAmount] = useState("");
+  // Paypal
+  const MY_PAYPAL_USER = "tmmckr";
   // Datum standardmäßig auf "Heute" setzen
   const [newExpDate, setNewExpDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -320,10 +322,26 @@ function App() {
               {expenses.length === 0 && <p style={{textAlign:'center', color:'#888', marginTop:'30px'}}>Noch keine Ausgaben eingetragen.</p>}
             </div>
 
-            {/* STICKY TOTAL FOOTER */}
-            <div className="total-sticky-bar">
-              <span className="total-label">Gesamtsumme</span>
-              <span className="total-value">{formatCurrency(totalAmount)}</span>
+            {/* STICKY FOOTER WRAPPER (PayPal + Summe) */}
+            <div className="sticky-footer-wrapper">
+              
+              {/* PayPal Button nur anzeigen, wenn Summe größer 0 ist */}
+              {totalAmount > 0 && (
+                <a 
+                  href={`https://www.paypal.com/paypalme/${tmmckr}/${totalAmount.toFixed(2)}EUR`}
+                  className="paypal-btn"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {/* Kleines PayPal Logo (Text-basiert oder Icon) */}
+                  <span>🅿️</span> Jetzt begleichen
+                </a>
+              )}
+
+              <div className="total-sticky-bar">
+                <span className="total-label">Gesamtsumme</span>
+                <span className="total-value">{formatCurrency(totalAmount)}</span>
+              </div>
             </div>
           </>
         )}

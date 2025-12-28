@@ -281,14 +281,48 @@ button.primary-btn:active { opacity: 0.7; transform: scale(0.98); }
   color: #1c1c1e;
 }
 
-.total-sticky-bar {
+/* --- NEUER STICKY FOOTER CONTAINER --- */
+/* Dieser Container klebt unten und hält Button + Summe zusammen */
+.sticky-footer-wrapper {
   position: fixed;
-  bottom: 85px; /* Genau über der Navigation */
-  left: 50%;
-  transform: translateX(-50%);
-  width: 90%; /* Nicht ganz voller Bildschirm */
+  bottom: 85px; /* Über der Navigation */
+  left: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px; /* Abstand zwischen PayPal Button und Summe */
+  z-index: 900;
+  pointer-events: none; /* WICHTIG: Damit man links/rechts daneben noch klicken kann */
+}
+
+/* Der eigentliche PayPal Button */
+.paypal-btn {
+  background-color: #0070BA; /* Original PayPal Blau */
+  color: white;
+  text-decoration: none;
+  font-weight: bold;
+  padding: 10px 20px;
+  border-radius: 50px;
+  box-shadow: 0 4px 15px rgba(0, 112, 186, 0.4);
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto; /* Button muss klickbar sein */
+  transition: transform 0.1s;
+}
+
+.paypal-btn:active {
+  transform: scale(0.95);
+}
+
+/* Die Summen-Leiste (angepasst, nicht mehr fixed, da jetzt im Wrapper) */
+.total-sticky-bar {
+  /* Position ist jetzt relativ zum Wrapper */
+  width: 90%;
   max-width: 550px;
-  background: rgba(0, 0, 0, 0.85); /* Dunkler Hintergrund für Kontrast */
+  background: rgba(0, 0, 0, 0.85);
   backdrop-filter: blur(10px);
   color: white;
   padding: 15px 20px;
@@ -297,7 +331,7 @@ button.primary-btn:active { opacity: 0.7; transform: scale(0.98); }
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-  z-index: 900;
+  pointer-events: auto; /* Leiste soll klickbar/sichtbar sein */
 }
 
 .total-label { font-size: 14px; color: #ddd; }
