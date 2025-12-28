@@ -253,3 +253,64 @@ button.primary-btn:active { opacity: 0.7; transform: scale(0.98); }
   font-size: 12px;
   background: none; border: none; font-weight: 600; cursor: pointer;
 }
+
+/* --- RECHNUNG / FINANZEN STYLES --- */
+.expense-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #E5E5EA;
+}
+.expense-item:last-child { border-bottom: none; }
+
+.expense-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.expense-date {
+  font-size: 12px;
+  color: #8E8E93;
+  margin-top: 2px;
+}
+
+.expense-amount {
+  font-weight: 700;
+  font-size: 16px;
+  color: #1c1c1e;
+}
+
+.total-sticky-bar {
+  position: fixed;
+  bottom: 85px; /* Genau über der Navigation */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%; /* Nicht ganz voller Bildschirm */
+  max-width: 550px;
+  background: rgba(0, 0, 0, 0.85); /* Dunkler Hintergrund für Kontrast */
+  backdrop-filter: blur(10px);
+  color: white;
+  padding: 15px 20px;
+  border-radius: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  z-index: 900;
+}
+
+.total-label { font-size: 14px; color: #ddd; }
+.total-value { font-size: 20px; font-weight: 700; color: #34C759; } /* iOS Grün */
+
+.month-divider {
+  background: #E5E5EA;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  display: inline-block;
+}

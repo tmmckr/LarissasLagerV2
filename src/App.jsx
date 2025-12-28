@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import './App.css';
 import { onSnapshot, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db, lagerCollection, mealsCollection } from './firebase';
+import { db, lagerCollection, mealsCollection, expensesCollection } from './firebase';
 
 function App() {
-  // Navigation State
-  const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' oder 'meals'
+  // Navigation State: 'inventory', 'meals', oder 'expenses'
+  const [activeTab, setActiveTab] = useState('inventory'); 
 
   // --- LAGER LOGIK ---
   const [items, setItems] = useState([]);
@@ -16,29 +16,40 @@ function App() {
   // --- REZEPTE LOGIK ---
   const [meals, setMeals] = useState([]);
   const [newMealName, setNewMealName] = useState("");
-  // State für Zutaten-Hinzufügen innerhalb eines Rezepts
   const [ingName, setIngName] = useState("");
   const [ingAmount, setIngAmount] = useState("");
   const [ingStore, setIngStore] = useState("Rewe");
-  const [activeMealIdForInput, setActiveMealIdForInput] = useState(null); // Welches Rezept bearbeiten wir gerade?
+  const [activeMealIdForInput, setActiveMealIdForInput] = useState(null);
 
-  // LÄDEN LISTE (Jetzt mit Lidl)
+  // --- RECHNUNG / FINANZEN LOGIK (NEU) ---
+  const [expenses, setExpenses] = useState([]);
+  const [newExpDesc, setNewExpDesc] = useState("");
+  const [newExpAmount, setNewExpAmount] = useState("");
+  // Datum standardmäßig auf "Heute" setzen
+  const [newExpDate, setNewExpDate] = useState(new Date().toISOString().split('T')[0]);
+
   const stores = ["Rewe", "Rossmann", "Dm", "Aldi", "Edeka", "Lidl"];
 
-  // 1. DATEN LADEN (Beide Collections)
+  // 1. DATEN LADEN (Alle 3 Collections)
   useEffect(() => {
-    // Lager laden
     const unsubLager = onSnapshot(lagerCollection, (snapshot) => {
       setItems(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
     });
-    // Mahlzeiten laden
     const unsubMeals = onSnapshot(mealsCollection, (snapshot) => {
       setMeals(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })));
+    });
+    // NEU: Ausgaben laden
+    const unsubExpenses = onSnapshot(expensesCollection, (snapshot) => {
+      const loadedExpenses = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      // Sortieren nach Datum (neueste oben)
+      loadedExpenses.sort((a, b) => new Date(b.date) - new Date(a.date));
+      setExpenses(loadedExpenses);
     });
 
     return () => {
       unsubLager();
       unsubMeals();
+      unsubExpenses();
     };
   }, []);
 
@@ -57,19 +68,11 @@ function App() {
     await updateDoc(itemDoc, { quantity: Math.max(0, currentQuantity + change) });
   };
 
-  const deleteItem = async (id) => {
-    await deleteDoc(doc(db, "lagerbestand", id));
-  };
-
   // --- REZEPTE FUNKTIONEN ---
   const addMeal = async (e) => {
     e.preventDefault();
     if (!newMealName) return;
-    // Ein neues Rezept ist ein Dokument mit Namen und einer leeren Zutatenliste
-    await addDoc(mealsCollection, {
-      name: newMealName,
-      ingredients: [] 
-    });
+    await addDoc(mealsCollection, { name: newMealName, ingredients: [] });
     setNewMealName("");
   };
 
@@ -77,31 +80,66 @@ function App() {
     await deleteDoc(doc(db, "essensplan", id));
   };
 
-  // Zutat zu einem Rezept hinzufügen
   const addIngredientToMeal = async (meal) => {
     if (!ingName) return;
-    
-    const newIngredient = {
-      name: ingName,
-      amount: ingAmount,
-      store: ingStore
-    };
-
+    const newIngredient = { name: ingName, amount: ingAmount, store: ingStore };
     const updatedIngredients = [...(meal.ingredients || []), newIngredient];
-    
     const mealDoc = doc(db, "essensplan", meal.id);
     await updateDoc(mealDoc, { ingredients: updatedIngredients });
-    
-    // Reset inputs
     setIngName(""); setIngAmount(""); setActiveMealIdForInput(null);
   };
 
+  // --- FINANZEN FUNKTIONEN (NEU) ---
+  const addExpense = async (e) => {
+    e.preventDefault();
+    if (!newExpDesc || !newExpAmount) return;
+
+    await addDoc(expensesCollection, {
+      desc: newExpDesc,
+      amount: parseFloat(newExpAmount), // Als Zahl speichern für Mathe
+      date: newExpDate
+    });
+
+    setNewExpDesc("");
+    setNewExpAmount("");
+    // Datum lassen wir auf dem zuletzt gewählten stehen, falls man mehrere Sachen vom gleichen Tag einträgt
+  };
+
+  const deleteExpense = async (id) => {
+    if(window.confirm("Eintrag wirklich löschen?")) {
+      await deleteDoc(doc(db, "ausgaben", id));
+    }
+  };
+
+  // Berechnung der Gesamtsumme
+  const totalAmount = expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
+  // Helper: Formatierung als Währung (z.B. 12,50 €)
+  const formatCurrency = (num) => {
+    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(num);
+  };
+
+  // Helper: Datum schön formatieren (z.B. 24.12.2023)
+  const formatDate = (dateString) => {
+    const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
+    return new Date(dateString).toLocaleDateString('de-DE', options);
+  };
+
+  // Helper: Gruppierung nach Monat für die Anzeige
+  // Wir erstellen ein Objekt: { "Dezember 2023": [Items...], "November 2023": [Items...] }
+  const expensesByMonth = expenses.reduce((groups, expense) => {
+    const date = new Date(expense.date);
+    const monthYear = date.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+    if (!groups[monthYear]) {
+      groups[monthYear] = [];
+    }
+    groups[monthYear].push(expense);
+    return groups;
+  }, {});
+
+
   // --- EINKAUFSLISTE GENERIEREN ---
-  // Kombiniert leere Lagerbestände UND Zutaten aus den Rezepten?
-  // Für dieses Beispiel trennen wir es visuell, damit es übersichtlich bleibt.
-  
   const shoppingListItems = items.filter(item => item.quantity === 0);
-  
   const shoppingListByStore = shoppingListItems.reduce((acc, item) => {
     const store = item.store || "Sonstiges";
     if (!acc[store]) acc[store] = [];
@@ -113,12 +151,10 @@ function App() {
     <div>
       <div className="container">
         
-        {/* VIEW 1: LAGER & EINKAUFSLISTE */}
+        {/* VIEW 1: LAGER */}
         {activeTab === 'inventory' && (
           <>
             <h1>Larissa's Lager</h1>
-            
-            {/* Input Card */}
             <div className="card">
               <h3>Neues Produkt</h3>
               <form onSubmit={addItem} style={{marginTop: '10px'}}>
@@ -139,7 +175,6 @@ function App() {
               </form>
             </div>
 
-            {/* Inventory List */}
             <h2>📦 Bestand</h2>
             <div className="inventory-list">
               {items.map(item => (
@@ -157,7 +192,6 @@ function App() {
               ))}
             </div>
 
-            {/* Shopping List */}
             <h2>🛒 Einkaufsliste</h2>
             {shoppingListItems.length === 0 ? <p style={{color:'#8E8E93'}}>Alles da!</p> : (
               <div>
@@ -179,11 +213,10 @@ function App() {
           </>
         )}
 
-        {/* VIEW 2: ESSEN HEUTE (REZEPTE) */}
+        {/* VIEW 2: KOCHEN */}
         {activeTab === 'meals' && (
           <>
             <h1>Essen heute</h1>
-            
             <div className="card">
               <h3>Was essen wir?</h3>
               <form onSubmit={addMeal} style={{marginTop: '10px', display:'flex', gap:'10px'}}>
@@ -195,16 +228,13 @@ function App() {
                 <button type="submit" className="primary-btn" style={{width:'auto'}}>Go</button>
               </form>
             </div>
-
             <div className="meal-list">
               {meals.map(meal => (
                 <div key={meal.id} className="meal-card">
                   <div className="meal-header">
                     <span style={{fontSize:'20px', fontWeight:'700'}}>{meal.name}</span>
-                    <button className="delete-meal" onClick={() => deleteMeal(meal.id)}>Fertig / Löschen</button>
+                    <button className="delete-meal" onClick={() => deleteMeal(meal.id)}>Löschen</button>
                   </div>
-
-                  {/* Zutaten Liste für dieses Gericht */}
                   <div className="ingredient-list">
                     {meal.ingredients && meal.ingredients.length > 0 ? (
                       meal.ingredients.map((ing, index) => (
@@ -213,40 +243,87 @@ function App() {
                           <span style={{color:'#8E8E93', fontSize:'13px'}}>{ing.store}</span>
                         </div>
                       ))
-                    ) : <p style={{fontSize:'14px', color:'#aaa'}}>Noch keine Zutaten</p>}
+                    ) : <p style={{fontSize:'14px', color:'#aaa'}}>Keine Zutaten</p>}
                   </div>
-
-                  {/* Zutaten hinzufügen Feld */}
                   {activeMealIdForInput === meal.id ? (
                     <div className="add-ingredient-box">
                       <input 
-                        type="text" placeholder="Zutat (z.B. Nudeln)" 
-                        value={ingName} onChange={e => setIngName(e.target.value)} autoFocus
+                        type="text" placeholder="Zutat" value={ingName} onChange={e => setIngName(e.target.value)} autoFocus
                       />
                       <div style={{display:'flex', gap:'5px'}}>
-                        <input 
-                          type="text" placeholder="Menge" style={{width:'80px'}}
-                          value={ingAmount} onChange={e => setIngAmount(e.target.value)}
-                        />
+                        <input type="text" placeholder="Menge" style={{width:'80px'}} value={ingAmount} onChange={e => setIngAmount(e.target.value)} />
                         <select value={ingStore} onChange={e => setIngStore(e.target.value)}>
                           {stores.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                       </div>
                       <div style={{display:'flex', gap:'10px', marginTop:'5px'}}>
-                        <button className="primary-btn" onClick={() => addIngredientToMeal(meal)} style={{fontSize:'14px', padding:'8px'}}>Speichern</button>
-                        <button className="delete-btn" onClick={() => setActiveMealIdForInput(null)}>Abbruch</button>
+                        <button className="primary-btn" onClick={() => addIngredientToMeal(meal)} style={{padding:'8px'}}>Save</button>
+                        <button className="delete-btn" onClick={() => setActiveMealIdForInput(null)}>X</button>
                       </div>
                     </div>
                   ) : (
-                    <button 
-                      style={{background:'none', border:'none', color:'#007AFF', marginTop:'10px', fontSize:'15px', fontWeight:'600', cursor:'pointer'}}
-                      onClick={() => setActiveMealIdForInput(meal.id)}
-                    >
-                      + Zutaten hinzufügen
-                    </button>
+                    <button style={{background:'none', border:'none', color:'#007AFF', marginTop:'10px', fontWeight:'600'}} onClick={() => setActiveMealIdForInput(meal.id)}>+ Zutaten</button>
                   )}
                 </div>
               ))}
+            </div>
+          </>
+        )}
+
+        {/* VIEW 3: RECHNUNG (NEU) */}
+        {activeTab === 'expenses' && (
+          <>
+            <h1>Abrechnung</h1>
+            
+            <div className="card">
+              <h3>Neuer Eintrag</h3>
+              <form onSubmit={addExpense} style={{marginTop: '10px'}}>
+                <input 
+                  type="text" placeholder="Beschreibung (z.B. McDonald's)" 
+                  value={newExpDesc} onChange={(e) => setNewExpDesc(e.target.value)}
+                />
+                <div style={{display:'flex', gap:'10px'}}>
+                  <input 
+                    type="number" step="0.01" placeholder="Betrag (€)" 
+                    value={newExpAmount} onChange={(e) => setNewExpAmount(e.target.value)}
+                  />
+                  <input 
+                    type="date" 
+                    value={newExpDate} onChange={(e) => setNewExpDate(e.target.value)}
+                  />
+                </div>
+                <button type="submit" className="primary-btn">Hinzufügen</button>
+              </form>
+            </div>
+
+            <div style={{marginBottom: '100px'}}> {/* Platz für Sticky Footer */}
+              {Object.keys(expensesByMonth).map(month => (
+                <div key={month}>
+                  <div className="month-divider">{month}</div>
+                  <div className="card" style={{padding: '0 16px'}}> {/* Liste in einer Karte */}
+                    {expensesByMonth[month].map(exp => (
+                      <div key={exp.id} className="expense-item">
+                        <div className="expense-info">
+                          <span style={{fontWeight:'600'}}>{exp.desc}</span>
+                          <span className="expense-date">{formatDate(exp.date)}</span>
+                        </div>
+                        <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                          <span className="expense-amount">{formatCurrency(exp.amount)}</span>
+                          <button className="delete-btn" onClick={() => deleteExpense(exp.id)}>✕</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              
+              {expenses.length === 0 && <p style={{textAlign:'center', color:'#888', marginTop:'30px'}}>Noch keine Ausgaben eingetragen.</p>}
+            </div>
+
+            {/* STICKY TOTAL FOOTER */}
+            <div className="total-sticky-bar">
+              <span className="total-label">Gesamtsumme</span>
+              <span className="total-value">{formatCurrency(totalAmount)}</span>
             </div>
           </>
         )}
@@ -268,6 +345,13 @@ function App() {
         >
           <span className="nav-icon">🍝</span>
           Kochen
+        </button>
+        <button 
+          className={`nav-item ${activeTab === 'expenses' ? 'active' : ''}`}
+          onClick={() => setActiveTab('expenses')}
+        >
+          <span className="nav-icon">💸</span>
+          Rechnung
         </button>
       </div>
     </div>

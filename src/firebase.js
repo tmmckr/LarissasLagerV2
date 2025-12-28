@@ -15,4 +15,5 @@ export const db = getFirestore(app);
 
 // Wir exportieren zwei Sammlungen:
 export const lagerCollection = collection(db, "lagerbestand");
-export const mealsCollection = collection(db, "essensplan"); // NEU
+export const mealsCollection = collection(db, "essensplan");
+export const expensesCollection = collection(db, "ausgaben");
