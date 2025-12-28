@@ -328,7 +328,7 @@ function App() {
               {/* PayPal Button nur anzeigen, wenn Summe größer 0 ist */}
               {totalAmount > 0 && (
                 <a 
-                  href={`https://www.paypal.com/paypalme/${tmmckr}/${totalAmount.toFixed(2)}EUR`}
+                  href={`https://www.paypal.com/paypalme/${MY_PAYPAL_USER}/${totalAmount.toFixed(2)}EUR`}
                   className="paypal-btn"
                   target="_blank"
                   rel="noopener noreferrer"
